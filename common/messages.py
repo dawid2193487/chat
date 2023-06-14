@@ -63,7 +63,7 @@ class NetMessage:
         return n, buf
 
     @staticmethod
-    def deserialize(buf: bytes):
+    def deserialize(buf: bytes) -> Tuple["NetMessage", bytes]:
         identifier, buf = int(buf[0]), buf[1:]
         cls = NET_MESSAGE_MANAGER.get_class(identifier)
         fields = dataclasses.fields(cls)
@@ -82,7 +82,7 @@ class NetMessage:
         obj = cls(**reconstructed_fields)
         return obj, buf
 
-    def serialize(self):
+    def serialize(self) -> bytes:
         identifier = NET_MESSAGE_MANAGER.get_identifier(self.__class__)
         fields = dataclasses.fields(self) # type: ignore
         buf = identifier.to_bytes(1, "big")

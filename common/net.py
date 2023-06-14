@@ -1,6 +1,7 @@
 import socket
 from select import select
 from typing import Tuple, Union
+from common import messages
 
 BUFSIZE = 4096
 
@@ -51,6 +52,17 @@ class TcpStream:
         sent_bytes_amount = self.socket.send(buf)
         assert sent_bytes_amount == len(buf)
 
+    def receive_message(self) -> Union[messages.NetMessage, None]:
+        buf = self.read()
+        if buf is None:
+            return None
+        
+        return messages.NetMessage.deserialize(buf)[0]
+    
+    def send_message(self, message: messages.NetMessage):
+        self.write(message.serialize())
+
+
 
 class TcpListener:
     def __init__(self, port):
@@ -77,3 +89,8 @@ class TcpListener:
             for (addr, session) in self.sessions.items()
             if not session.closed
         }
+
+    def await_event(self):
+        sessions = [session.socket for session in self.sessions.values()]
+        readable, writable, errored = select([self.socket]+sessions, [], [])
+        return
