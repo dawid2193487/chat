@@ -1,0 +1,13 @@
+services:
+  chat_server_1:
+    build: .
+    ports:
+      - "3001:3333"
+    environment:
+      PYTHONUNBUFFERED: 1
+  chat_server_2:
+    build: .
+    ports:
+      - "3002:3333"
+    environment:
+      PYTHONUNBUFFERED: 1
