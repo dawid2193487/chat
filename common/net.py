@@ -11,17 +11,24 @@ class SocketError(Exception):
 class SocketClosed(Exception):
     pass
 
-class TcpStream:
+class Stream:
     def __init__(self, socket: socket.socket):
         self.socket = socket
         self.closed = False
+        self.remainder = bytes()
         
     @classmethod
-    def to_ip(cls, ip: str, port: int) -> "TcpStream":
+    def to_ip(cls, ip: str, port: int) -> "Stream":
         # s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # FIXME: pierdolnij to mu tak żeby było nieczytelnie żeby był zadowolony
         s = socket.create_connection((ip, port))
         return cls(s)
+
+    @property
+    def has_pending_data(self):
+        pending = self.pending
+        self.pending = False
+        return pending
 
     # @classmethod
     # def from_socket(cls, socket: socket.socket):
@@ -55,22 +62,35 @@ class TcpStream:
     def receive_message(self) -> Union[messages.NetMessage, None]:
         buf = self.read()
         if buf is None:
-            return None
+            buf = bytes()
         
-        return messages.NetMessage.deserialize(buf)[0]
+        buf = self.remainder + buf
+        print(buf)
+        
+        if len(buf) == 0:
+            return None
+
+        msg, self.remainder = messages.NetMessage.deserialize(buf)
+        self.pending = len(self.remainder) != 0
+        return msg
+        # return messages.NetMessage.deserialize(buf)[0]
     
     def send_message(self, message: messages.NetMessage):
         self.write(message.serialize())
 
+    def await_event(self):
+        readable, writable, errored = select([self.socket], [], [])
+        return
 
 
-class TcpListener:
+
+class Listener:
     def __init__(self, port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind(("", port))
         self.socket.listen()
 
-        self.sessions: dict[Tuple[str, int], TcpStream] = {}
+        self.sessions: dict[Tuple[str, int], Stream] = {}
 
     @property
     def connection_count(self):
@@ -80,7 +100,7 @@ class TcpListener:
         readable, writable, errored = select([self.socket], [], [], 0)
         while readable:
             session_socket, remote_address = self.socket.accept()
-            self.sessions[remote_address] = TcpStream(session_socket)
+            self.sessions[remote_address] = Stream(session_socket)
             readable, writable, errored = select([self.socket], [], [], 0)
 
     def remove_closed_connections(self):
@@ -91,6 +111,9 @@ class TcpListener:
         }
 
     def await_event(self):
+        for session in self.sessions.values():
+            if session.has_pending_data:
+                return
         sessions = [session.socket for session in self.sessions.values()]
         readable, writable, errored = select([self.socket]+sessions, [], [])
         return

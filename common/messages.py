@@ -96,11 +96,17 @@ class NetMessage:
         
         return buf
 
+@dataclass
+class SignIn(NetMessage):
+    name: str
+    password: str
+NET_MESSAGE_MANAGER.register(SignIn)
 
 @dataclass
 class User(NetMessage):
     name: str
     host: str
+    port: int
 NET_MESSAGE_MANAGER.register(User)
 
 
@@ -113,7 +119,7 @@ NET_MESSAGE_MANAGER.register(Message)
 
 
 if __name__ == "__main__":
-    msg = Message(sender=User("a", "b"), to=User("a", "b"), contents="siema eniu")
+    msg = Message(sender=User("a", "b", 3333), to=User("a", "b", 3333), contents="siema eniu")
     serialized = msg.serialize()
     deserialized, _ = NetMessage.deserialize(serialized)
     assert msg == deserialized
