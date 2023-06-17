@@ -16,12 +16,18 @@ class Stream:
         self.socket = socket
         self.closed = False
         self.remainder = bytes()
+        self.pending = False
         
     @classmethod
-    def to_ip(cls, ip: str, port: int) -> "Stream":
-        # s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # FIXME: pierdolnij to mu tak żeby było nieczytelnie żeby był zadowolony
-        s = socket.create_connection((ip, port))
+    def tcp(cls, host: str, port: int) -> "Stream":
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((host, port))
+        return cls(s)
+    
+    @classmethod
+    def sctp(cls, host: str, port: int) -> "Stream":
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_SCTP)
+        s.connect((host, port))
         return cls(s)
 
     @property
@@ -30,14 +36,9 @@ class Stream:
         self.pending = False
         return pending
 
-    # @classmethod
-    # def from_socket(cls, socket: socket.socket):
-    #     self = cls()
-    #     return self
-
     def read(self) -> Union[bytes, None]:
         if self.closed:
-            return None
+            raise SocketClosed
 
         readable, writable, errored = select([self.socket], [], [self.socket], 0)
         if readable:
@@ -65,7 +66,7 @@ class Stream:
             buf = bytes()
         
         buf = self.remainder + buf
-        print(buf)
+        #print(buf)
         
         if len(buf) == 0:
             return None
@@ -76,21 +77,42 @@ class Stream:
         # return messages.NetMessage.deserialize(buf)[0]
     
     def send_message(self, message: messages.NetMessage):
+        #print(f"Sending: {message}")
         self.write(message.serialize())
 
     def await_event(self):
+        #print("waiting for message...")
         readable, writable, errored = select([self.socket], [], [])
         return
 
-
+def await_any(listeners: list["Listener"]):
+    # waits for any event in any of the listeners
+    sockets = [listener.socket for listener in listeners]
+    for listener in listeners:
+        sockets += [session.socket for session in listener.sessions.values()]
+    readable, writable, errored = select(sockets, [], [])
+    return
 
 class Listener:
-    def __init__(self, port):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.bind(("", port))
-        self.socket.listen()
-
+    def __init__(self, socket: socket.socket):
+        self.socket = socket
         self.sessions: dict[Tuple[str, int], Stream] = {}
+
+    @classmethod
+    def tcp(cls, port: int):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("", port))
+        s.listen()
+
+        return cls(s)
+
+    @classmethod
+    def sctp(cls, port: int):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_SCTP)
+        s.bind(("", port))
+        s.listen()
+
+        return cls(s)
 
     @property
     def connection_count(self):

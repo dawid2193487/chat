@@ -1,13 +1,25 @@
 services:
-  chat_server_1:
+  knorr:
+    hostname: knorr
     build: .
     ports:
       - "3001:3333"
     environment:
       PYTHONUNBUFFERED: 1
-  chat_server_2:
+
+  lenor:
+    hostname: lenor
     build: .
     ports:
       - "3002:3333"
+    environment:
+      PYTHONUNBUFFERED: 1
+
+  knorr-client:
+    build: 
+      context: .
+      dockerfile: Dockerfile-client
+    depends_on:
+      - knorr
     environment:
       PYTHONUNBUFFERED: 1

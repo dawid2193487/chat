@@ -99,15 +99,18 @@ class NetMessage:
 @dataclass
 class SignIn(NetMessage):
     name: str
-    password: str
 NET_MESSAGE_MANAGER.register(SignIn)
 
 @dataclass
 class User(NetMessage):
     name: str
     host: str
-    port: int
 NET_MESSAGE_MANAGER.register(User)
+
+@dataclass
+class ServerIdentity(NetMessage):
+    hostname: str
+NET_MESSAGE_MANAGER.register(ServerIdentity)
 
 
 @dataclass
@@ -115,6 +118,9 @@ class Message(NetMessage):
     sender: User
     to: User
     contents: str
+    def __str__(self) -> str:
+        return f"{self.sender.name}@{self.sender.host} -> {self.to.name}@{self.to.host}: {self.contents}"
+
 NET_MESSAGE_MANAGER.register(Message)
 
 

@@ -32,16 +32,10 @@ assert type(ident) is net.messages.ServerIdentity
 host = ident.hostname
 print(f"Connected to {host}.")
 
-session.send_message(
-    messages.Message(
-        sender=messages.User(username, host), 
-        to=messages.User("echo", "knorr"), 
-        contents="siema"
-    )
-)
-
 while True:
     session.await_event()
     msg = session.receive_message()
     assert type(msg) is messages.Message
     print(f"Received: {msg}")
+    response = messages.Message(msg.to, msg.sender, msg.contents)
+    session.send_message(response)
