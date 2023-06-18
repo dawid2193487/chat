@@ -1,7 +1,11 @@
 import sys
 import signal
+import threading
+import time
+
 from common import net
 from common import messages
+
 
 signal.signal(signal.SIGTERM, lambda dont, care: exit(0))
 
@@ -32,16 +36,47 @@ assert type(ident) is net.messages.ServerIdentity
 host = ident.hostname
 print(f"Connected to {host}.")
 
-session.send_message(
-    messages.Message(
-        sender=messages.User(username, host), 
-        to=messages.User("echo", "knorr"), 
-        contents="siema"
+def send_msg(server, user, message):
+    session.send_message(
+        messages.Message(
+            sender=messages.User(username, host), 
+            to=messages.User(user, server), 
+            contents=message
+        )
     )
-)
 
-while True:
-    session.await_event()
-    msg = session.receive_message()
-    assert type(msg) is messages.Message
-    print(f"Received: {msg}")
+shared_bool = threading.Event()
+
+def receive_messages(shared_bool):
+    while True:
+        try:
+            if shared_bool.is_set():
+                print("Quit thread")
+                break
+
+            time.sleep(0.1)
+            # session.await_event()
+            msg = session.receive_message()
+            # assert type(msg) is messages.Message
+            if msg is not None:
+                print(f"\n Received: {msg} \n")
+        except:
+            print("Error reciving message")
+
+thread = threading.Thread(target=receive_messages, args=(shared_bool, ))
+thread.start()
+
+def send_messages():
+    try:
+        while True:
+            server = input("Choose server `knorr` or `lenor` : ")
+            user = input("Choose user : ")
+            userMessage = input("Write message: ")   
+            send_msg(server, user, userMessage)
+            time.sleep(1)
+    except KeyboardInterrupt:
+        shared_bool.set() 
+        thread.join()     
+        print("Crtl + C pressed")
+
+send_messages()

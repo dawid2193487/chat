@@ -69,7 +69,7 @@ class Server:
     def pass_local_message(self, msg: net.messages.Message, stream: net.Stream):
         destination = msg.to
         # If message is to a local user
-        if destination.host == self.hostname:
+        if destination.host.strip() == self.hostname:
             if destination_streams := self.user_map[destination.name]:
                 # User is online, send the message to them
                 successful_deliveries = 0
@@ -90,7 +90,8 @@ class Server:
     @bind(net.messages.Message)
     def pass_remote_message(self, msg: net.messages.Message, stream: net.Stream):
         #print("passing remote message")
-        remote_stream = net.Stream.sctp(msg.to.host, 3333)
+        #print(f"Message server: ##{msg.to.host}##")
+        remote_stream = net.Stream.sctp(msg.to.host.strip(), 3333)
         remote_stream.send_message(msg)
 
     def dispatch(self, msg: net.messages.NetMessage, stream: net.Stream):
