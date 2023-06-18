@@ -1,3 +1,4 @@
+from collections import defaultdict
 import sys
 import signal
 import threading
@@ -37,17 +38,24 @@ host = ident.hostname
 print(f"Connected to {host}.")
 
 def send_msg(server, user, message):
+    to = messages.User(user, server)
+    msg = messages.Message(
+        sender=messages.User(username, host), 
+        to=to, 
+        contents=message
+    )
     session.send_message(
-        messages.Message(
-            sender=messages.User(username, host), 
-            to=messages.User(user, server), 
-            contents=message
-        )
+        msg
     )
 
+    return to, msg
+
 shared_bool = threading.Event()
+contacts: dict[net.messages.User, list[net.messages.Message]] = defaultdict(list)
 
 def receive_messages(shared_bool):
+    global contacts
+
     while True:
         try:
             if shared_bool.is_set():
@@ -55,24 +63,82 @@ def receive_messages(shared_bool):
                 break
 
             time.sleep(0.1)
-            # session.await_event()
             msg = session.receive_message()
-            # assert type(msg) is messages.Message
             if msg is not None:
-                print(f"\n Received: {msg} \n")
+                if type(msg) is messages.Message:
+                    contacts[msg.sender].append(msg)
         except:
             print("Error reciving message")
 
 thread = threading.Thread(target=receive_messages, args=(shared_bool, ))
 thread.start()
 
+def timeout_input(prompt, timeout=5):
+    import sys
+    import select
+    print(prompt)
+    inputs, _, _ = select.select([sys.stdin], [], [], timeout)
+
+    if inputs:
+        user_input = sys.stdin.readline().strip()
+        return user_input
+    else:
+        return None
+
+
 def send_messages():
     try:
         while True:
-            server = input("Choose server `knorr` or `lenor` : ")
-            user = input("Choose user : ")
-            userMessage = input("Write message: ")   
-            send_msg(server, user, userMessage)
+            import sys
+            sys.stdout.write("\033[H\033[J")
+            sys.stdout.flush() 
+            print(f"Logged in: {username}@{host}")
+            contact_selector: dict[int, net.messages.User] = {}
+            for i, (contact, messages) in enumerate(contacts.items()):
+                contact_selector[i] = contact
+                print(f"[{i}] {contact.name}@{contact.host} [{len(messages)}]")
+
+            print("[+] Add new contact")
+            print("[.] Refresh")
+            
+            chosen_user_str = timeout_input("Pick a contact: ")
+            if chosen_user_str is None:
+                continue
+
+            match chosen_user_str:
+                case "+":
+                    server = input("Choose server `knorr` or `lenor` : ")
+                    user = input("Choose user : ")
+                    userMessage = input("Write message: ") 
+                    sent_to, sent_msg = send_msg(server, user, userMessage)
+                    contacts[sent_to].append(sent_msg)
+                case ".":
+                    continue
+                case other:
+                    try:
+                        if int(chosen_user_str) in contact_selector:
+                            chosen_user = int(chosen_user_str)
+                            selected_contact = contact_selector[chosen_user]
+                            contact_messages = contacts[selected_contact]
+                            for message in contact_messages:
+                                print(message)
+
+                            print("")
+                            print("[1] Return to menu.")
+                            print("[2] Send a message")
+
+                            match int(input("Pick an option: ")):
+                                case 1:
+                                    continue
+                                case 2:
+                                    userMessage = input("Write message: ")
+                                    sent_to, sent_msg = send_msg(selected_contact.host, selected_contact.name, userMessage)
+                                    contacts[sent_to].append(sent_msg)
+                        else:
+                            print("No contact with that number")
+                    except (ValueError, KeyError):
+                        print("Invalid option.")
+
             time.sleep(1)
     except KeyboardInterrupt:
         shared_bool.set() 

@@ -105,6 +105,10 @@ NET_MESSAGE_MANAGER.register(SignIn)
 class User(NetMessage):
     name: str
     host: str
+
+    def __hash__(self):
+        return hash(self.name) ^ hash(self.host)
+
 NET_MESSAGE_MANAGER.register(User)
 
 @dataclass
